@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blackjack Royale 🎰</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Josefin+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════ LOGIN SCREEN ═══════════════════════════ -->
+<div id="loginScreen" class="screen">
+  <div class="login-particles" id="loginParticles"></div>
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo-diamonds">◆ ◆ ◆</div>
+      <h1 class="logo-title">BLACKJACK<br><span>ROYALE</span></h1>
+      <div class="logo-suits">♠ &nbsp; ♥ &nbsp; ♦ &nbsp; ♣</div>
+      <p class="logo-tagline">Casino Exclusivo · Fichas Falsas · Diversión Real</p>
+    </div>
+    <div class="login-form">
+      <div class="input-wrapper">
+        <input type="text" id="nicknameInput" placeholder="Tu apodo en la mesa..." maxlength="18" autocomplete="off">
+        <div class="input-line"></div>
+      </div>
+      <button id="joinBtn" class="btn-primary">
+        <span class="btn-text">ENTRAR AL CASINO</span>
+        <span class="btn-shine"></span>
+      </button>
+      <div id="loginError" class="login-error"></div>
+    </div>
+    <div class="chip-row">
+      <div class="deco-chip c1">1</div>
+      <div class="deco-chip c5">5</div>
+      <div class="deco-chip c25">25</div>
+      <div class="deco-chip c100">100</div>
+      <div class="deco-chip c500">500</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ GAME SCREEN ════════════════════════════ -->
+<div id="gameScreen" class="screen hidden">
+
+  <!-- Header -->
+  <header id="gameHeader">
+    <div class="header-left">
+      <span class="header-logo">♠ BLACKJACK ROYALE ♠</span>
+      <span id="roundBadge" class="round-badge">Lobby</span>
+    </div>
+    <div class="header-center" id="phaseDisplay">Esperando jugadores...</div>
+    <div class="header-right">
+      <div class="my-chips-display">
+        <span class="chips-label">Fichas</span>
+        <span id="headerChips" class="chips-value">1000</span>
+      </div>
+      <button id="soundToggle" class="icon-btn" title="Toggle sonido">🔊</button>
+      <button id="leaveBtn" class="btn-leave">Abandonar mesa</button>
+    </div>
+  </header>
+
+  <!-- Countdown Bar -->
+  <div id="countdownBar" class="countdown-bar hidden">
+    <div id="countdownFill" class="countdown-fill"></div>
+    <span id="countdownText" class="countdown-text"></span>
+  </div>
+
+  <!-- Main Layout -->
+  <div class="game-layout">
+
+    <!-- TABLE AREA -->
+    <div class="table-wrap">
+      <div id="gameTable" class="game-table">
+        <div class="table-felt">
+
+          <!-- Dealer Zone -->
+          <div class="dealer-zone">
+            <div class="zone-label">♦ DEALER ♦</div>
+            <div id="dealerCards" class="card-row"></div>
+            <div id="dealerScore" class="score-badge hidden"></div>
+          </div>
+
+          <!-- Divider con nombre del casino -->
+          <div class="table-divider">
+            <div class="divider-line"></div>
+            <div class="divider-center-text">
+              <span class="divider-diamond">◆</span>
+              <span class="casino-table-name">La del Peralta</span>
+              <span class="divider-diamond">◆</span>
+            </div>
+            <div class="divider-line"></div>
+          </div>
+
+          <!-- Other Players Row -->
+          <div id="otherPlayersRow" class="other-players-row"></div>
+
+          <!-- My Player Zone -->
+          <div id="myZone" class="my-zone">
+            <div class="bet-circle" id="myBetCircle">
+              <span id="myBetAmount">0</span>
+            </div>
+            <div id="myCards" class="card-row my-cards"></div>
+            <div id="myScore" class="score-badge hidden"></div>
+            <div id="myNickname" class="my-nickname-label"></div>
+          </div>
+
+        </div>
+
+        <!-- Betting Panel -->
+        <div id="bettingPanel" class="betting-panel hidden">
+          <div class="panel-title">◆ Coloca tu apuesta ◆</div>
+          <div class="chip-selector">
+            <button class="chip-btn c1"  data-val="1">1</button>
+            <button class="chip-btn c5"  data-val="5">5</button>
+            <button class="chip-btn c25" data-val="25">25</button>
+            <button class="chip-btn c100" data-val="100">100</button>
+            <button class="chip-btn c500" data-val="500">500</button>
+          </div>
+          <div class="bet-controls">
+            <div class="current-bet-display">
+              <span class="bet-label">Apuesta</span>
+              <span id="betDisplay">0</span>
+            </div>
+            <button id="clearBetBtn" class="btn-ghost">Limpiar</button>
+            <button id="confirmBetBtn" class="btn-primary">Apostar</button>
+            <button id="allInBtn" class="btn-allin">ALL IN 🚀</button>
+          </div>
+        </div>
+
+        <!-- Action Panel -->
+        <div id="actionPanel" class="action-panel hidden">
+          <button id="hitBtn"    class="action-btn btn-hit">HIT</button>
+          <button id="standBtn"  class="action-btn btn-stand">STAND</button>
+          <button id="doubleBtn" class="action-btn btn-double">DOUBLE</button>
+        </div>
+
+        <!-- Start Button (lobby only) -->
+        <div id="startPanel" class="start-panel">
+          <button id="startBtn" class="btn-start">
+            <span>INICIAR JUEGO</span>
+          </button>
+          <p class="start-hint" id="shareHint">Comparte la URL de esta página con tus amigos</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SIDE PANEL -->
+    <aside class="side-panel">
+
+      <!-- Tabs -->
+      <div class="side-tabs">
+        <button class="tab-btn active" data-tab="chat">Chat</button>
+        <button class="tab-btn" data-tab="ranking">Ranking</button>
+        <button class="tab-btn" data-tab="epic">Épicas</button>
+      </div>
+
+      <!-- Chat Tab -->
+      <div id="tab-chat" class="tab-content active">
+        <div id="chatMessages" class="chat-messages"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chatInput" placeholder="Escribe algo..." maxlength="180" autocomplete="off">
+          <button id="sendBtn">▶</button>
+        </div>
+      </div>
+
+      <!-- Ranking Tab -->
+      <div id="tab-ranking" class="tab-content hidden">
+        <div class="ranking-header">♛ Clasificación ♛</div>
+        <div id="rankingList" class="ranking-list"></div>
+      </div>
+
+      <!-- Epic Hands Tab -->
+      <div id="tab-epic" class="tab-content hidden">
+        <div class="ranking-header">🃏 Manos Épicas</div>
+        <div id="epicList" class="epic-list"></div>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- All-In Overlay -->
+  <div id="allInOverlay" class="allin-overlay hidden">
+    <div class="allin-text">ALL IN</div>
+    <div id="allInPlayer" class="allin-player"></div>
+    <div id="allInAmount" class="allin-amount"></div>
+  </div>
+
+  <!-- Win Particles Container -->
+  <div id="particles" class="particles-container"></div>
+</div>
+
+<!-- Result Toast -->
+<div id="resultToast" class="result-toast hidden"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="js/sounds.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
