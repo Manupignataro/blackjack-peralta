@@ -11,6 +11,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const STARTING_CHIPS = 1000;
+const MAX_PLAYERS    = 5;
 const BETTING_TIME   = 25;   // seconds
 const TURN_TIME      = 30;   // seconds
 const RESULTS_TIME   = 9000; // ms before next round
@@ -308,6 +309,8 @@ io.on('connection', socket => {
   socket.on('join', ({ nickname }) => {
     nickname = (nickname || '').trim().slice(0, 18);
     if (!nickname) return socket.emit('joinError', { msg: 'Nickname inválido' });
+    if (Object.keys(state.players).length >= MAX_PLAYERS)
+      return socket.emit('joinError', { msg: 'Mesa llena (máximo 5 jugadores)' });
     if (Object.values(state.players).some(p => p.nickname === nickname))
       return socket.emit('joinError', { msg: 'Ese nickname ya está en uso' });
 
@@ -397,6 +400,15 @@ io.on('connection', socket => {
     if (score > 21) addEpic(p, `💥 Doble bust (${score})`, -p.bet);
     broadcast();
     setTimeout(advanceTurn, 900);
+  });
+
+  socket.on('reloadChips', () => {
+    const p = state.players[socket.id];
+    if (!p || p.chips > 0 || p.bet > 0) return;
+    p.chips = STARTING_CHIPS;
+    socket.emit('chipsReloaded', { chips: STARTING_CHIPS });
+    io.emit('chat', { nickname: '🎰 Casino', message: `${p.nickname} recargó fichas 💰`, system: true });
+    broadcast();
   });
 
   socket.on('chat', ({ message }) => {

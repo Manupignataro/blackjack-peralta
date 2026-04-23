@@ -104,6 +104,7 @@
             <div id="myCards" class="card-row my-cards"></div>
             <div id="myScore" class="score-badge hidden"></div>
             <div id="myNickname" class="my-nickname-label"></div>
+            <button id="reloadChipsBtn" class="btn-reload hidden">💰 Recargar 1000 fichas</button>
           </div>
 
         </div>
@@ -147,14 +148,18 @@
       </div>
     </div>
 
+    <!-- Reopen panel button (visible when panel is closed) -->
+    <button id="reopenPanelBtn" class="reopen-panel-btn hidden" title="Abrir chat">◀</button>
+
     <!-- SIDE PANEL -->
-    <aside class="side-panel">
+    <aside class="side-panel" id="sidePanel">
 
       <!-- Tabs -->
       <div class="side-tabs">
         <button class="tab-btn active" data-tab="chat">Chat</button>
         <button class="tab-btn" data-tab="ranking">Ranking</button>
         <button class="tab-btn" data-tab="epic">Épicas</button>
+        <button id="closePanelBtn" class="close-panel-btn" title="Cerrar panel">✕</button>
       </div>
 
       <!-- Chat Tab -->

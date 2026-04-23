@@ -3,13 +3,21 @@
    ═══════════════════════════════════════════════════════════ */
 
 const socket = io();
-let myId     = null;
-let myChips  = 1000;
-let myBet    = 0;
-let phase    = 'lobby';
-let gs       = null;          // latest gameState
-let soundOn  = true;
-let cdMax    = 25;            // countdown max for fill calc
+let myId    = null;
+let myChips = 1000;
+let myBet   = 0;
+let phase   = 'lobby';
+let gs      = null;
+let soundOn = true;
+let cdMax   = 25;
+
+/* ─── Arc seat positions [left%, top%] within table-felt ──── */
+const SEAT_POS = {
+  1: [[50, 52]],
+  2: [[24, 58], [76, 58]],
+  3: [[11, 52], [50, 47], [89, 52]],
+  4: [[7, 48], [28, 62], [72, 62], [93, 48]],
+};
 
 /* ─── Login Particles ────────────────────────────────────── */
 (function initParticles() {
@@ -18,61 +26,73 @@ let cdMax    = 25;            // countdown max for fill calc
   for (let i = 0; i < 24; i++) {
     const el = document.createElement('div');
     el.style.cssText = `
-      position: absolute;
-      left: ${Math.random() * 100}%;
-      top: ${Math.random() * 100}%;
-      font-size: ${14 + Math.random() * 24}px;
-      color: rgba(201,168,76,${0.05 + Math.random() * 0.12});
-      animation: chipFloat ${3 + Math.random() * 4}s ${Math.random() * 3}s ease-in-out infinite;
-      pointer-events: none;
-    `;
-    el.textContent = SUITS[Math.floor(Math.random() * 4)];
+      position:absolute;left:${Math.random()*100}%;top:${Math.random()*100}%;
+      font-size:${14+Math.random()*24}px;
+      color:rgba(201,168,76,${0.05+Math.random()*0.12});
+      animation:chipFloat ${3+Math.random()*4}s ${Math.random()*3}s ease-in-out infinite;
+      pointer-events:none;`;
+    el.textContent = SUITS[Math.floor(Math.random()*4)];
     container.appendChild(el);
   }
 })();
 
 /* ─── DOM Refs ────────────────────────────────────────────── */
 const $ = id => document.getElementById(id);
-const loginScreen   = $('loginScreen');
-const gameScreen    = $('gameScreen');
-const nicknameInput = $('nicknameInput');
-const joinBtn       = $('joinBtn');
-const loginError    = $('loginError');
-const startBtn      = $('startBtn');
-const startPanel    = $('startPanel');
-const bettingPanel  = $('bettingPanel');
-const actionPanel   = $('actionPanel');
-const betDisplay    = $('betDisplay');
-const myBetCircle   = $('myBetCircle');
-const myBetAmount   = $('myBetAmount');
-const myCardsEl     = $('myCards');
-const myScoreEl     = $('myScore');
-const myNicknameEl  = $('myNickname');
-const dealerCardsEl = $('dealerCards');
-const dealerScoreEl = $('dealerScore');
-const otherPlayersEl= $('otherPlayersRow');
-const headerChips   = $('headerChips');
-const roundBadge    = $('roundBadge');
-const phaseDisplay  = $('phaseDisplay');
-const chatMessages  = $('chatMessages');
-const chatInput     = $('chatInput');
-const sendBtn       = $('sendBtn');
-const soundToggle   = $('soundToggle');
-const allInOverlay  = $('allInOverlay');
-const resultToast   = $('resultToast');
-const countdownBar  = $('countdownBar');
-const countdownFill = $('countdownFill');
-const countdownText = $('countdownText');
-const rankingList   = $('rankingList');
-const epicList      = $('epicList');
-const leaveBtn      = $('leaveBtn');
+const loginScreen    = $('loginScreen');
+const gameScreen     = $('gameScreen');
+const nicknameInput  = $('nicknameInput');
+const joinBtn        = $('joinBtn');
+const loginError     = $('loginError');
+const startBtn       = $('startBtn');
+const startPanel     = $('startPanel');
+const bettingPanel   = $('bettingPanel');
+const actionPanel    = $('actionPanel');
+const betDisplay     = $('betDisplay');
+const myBetCircle    = $('myBetCircle');
+const myBetAmount    = $('myBetAmount');
+const myCardsEl      = $('myCards');
+const myScoreEl      = $('myScore');
+const myNicknameEl   = $('myNickname');
+const dealerCardsEl  = $('dealerCards');
+const dealerScoreEl  = $('dealerScore');
+const otherPlayersEl = $('otherPlayersRow');
+const headerChips    = $('headerChips');
+const roundBadge     = $('roundBadge');
+const phaseDisplay   = $('phaseDisplay');
+const chatMessages   = $('chatMessages');
+const chatInput      = $('chatInput');
+const sendBtn        = $('sendBtn');
+const soundToggle    = $('soundToggle');
+const allInOverlay   = $('allInOverlay');
+const resultToast    = $('resultToast');
+const countdownBar   = $('countdownBar');
+const countdownFill  = $('countdownFill');
+const countdownText  = $('countdownText');
+const rankingList    = $('rankingList');
+const epicList       = $('epicList');
+const leaveBtn       = $('leaveBtn');
+const sidePanel      = $('sidePanel');
+const closePanelBtn  = $('closePanelBtn');
+const reopenPanelBtn = $('reopenPanelBtn');
+const reloadChipsBtn = $('reloadChipsBtn');
 
 /* ─── Sound Init ─────────────────────────────────────────── */
 document.addEventListener('click', () => sounds.init(), { once: true });
-
 soundToggle.addEventListener('click', () => {
   soundOn = sounds.toggle();
   soundToggle.textContent = soundOn ? '🔊' : '🔇';
+});
+
+/* ─── Chat Panel Toggle ───────────────────────────────────── */
+closePanelBtn.addEventListener('click', () => {
+  sidePanel.classList.add('closed');
+  reopenPanelBtn.classList.remove('hidden');
+  sounds.buttonClick();
+});
+reopenPanelBtn.addEventListener('click', () => {
+  sidePanel.classList.remove('closed');
+  reopenPanelBtn.classList.add('hidden');
+  sounds.buttonClick();
 });
 
 /* ─── Abandonar mesa ─────────────────────────────────────── */
@@ -86,8 +106,22 @@ leaveBtn.addEventListener('click', () => {
   myId = null; myChips = 1000; myBet = 0; phase = 'lobby'; gs = null;
 });
 
+/* ─── Reload Chips ────────────────────────────────────────── */
+reloadChipsBtn.addEventListener('click', () => {
+  socket.emit('reloadChips');
+  sounds.win();
+  reloadChipsBtn.classList.add('hidden');
+});
+socket.on('chipsReloaded', ({ chips }) => {
+  myChips = chips;
+  headerChips.textContent = chips;
+  reloadChipsBtn.classList.add('hidden');
+  showResultToast('💰 +1000 fichas recargadas!', true);
+});
+
 /* ─── Tab Switching ──────────────────────────────────────── */
 document.querySelectorAll('.tab-btn').forEach(btn => {
+  if (!btn.dataset.tab) return;
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
@@ -100,40 +134,30 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 /* ─── Login ──────────────────────────────────────────────── */
 joinBtn.addEventListener('click', doJoin);
 nicknameInput.addEventListener('keydown', e => e.key === 'Enter' && doJoin());
-
 function doJoin() {
   const nick = nicknameInput.value.trim();
   if (!nick) { loginError.textContent = 'Escribe un apodo'; return; }
   sounds.buttonClick();
   socket.emit('join', { nickname: nick });
 }
-
 socket.on('joinError', ({ msg }) => { loginError.textContent = msg; });
-
 socket.on('joined', ({ playerId, chips, phase: p }) => {
-  myId = playerId;
-  myChips = chips;
-  phase = p;
+  myId = playerId; myChips = chips; phase = p;
   loginScreen.classList.add('hidden');
   gameScreen.classList.remove('hidden');
   sounds.init();
   updatePhaseUI(p);
+  // Show share URL
+  const hint = $('shareHint');
+  if (hint) {
+    const url = location.hostname === 'localhost'
+      ? 'localhost:' + location.port : location.hostname;
+    hint.innerHTML = `Comparte <strong>${url}</strong> con tus amigos`;
+  }
 });
-
-/* ─── Share hint ─────────────────────────────────────────── */
-const shareHint = $('shareHint');
-if (shareHint) {
-  const url = location.hostname === 'localhost'
-    ? 'localhost:' + location.port
-    : location.hostname;
-  shareHint.innerHTML = `Comparte <strong>${url}</strong> con tus amigos`;
-}
 
 /* ─── Start Game ─────────────────────────────────────────── */
-startBtn.addEventListener('click', () => {
-  sounds.buttonClick();
-  socket.emit('startGame');
-});
+startBtn.addEventListener('click', () => { sounds.buttonClick(); socket.emit('startGame'); });
 
 /* ─── Betting ─────────────────────────────────────────────── */
 document.querySelectorAll('.chip-btn').forEach(btn => {
@@ -148,76 +172,53 @@ document.querySelectorAll('.chip-btn').forEach(btn => {
     flashEl(betDisplay);
   });
 });
-
 $('clearBetBtn').addEventListener('click', () => {
-  myBet = 0;
-  betDisplay.textContent = 0;
-  myBetAmount.textContent = 0;
-  myBetCircle.classList.remove('has-bet');
-  sounds.buttonClick();
+  myBet = 0; betDisplay.textContent = 0; myBetAmount.textContent = 0;
+  myBetCircle.classList.remove('has-bet'); sounds.buttonClick();
 });
-
 $('confirmBetBtn').addEventListener('click', () => {
   if (myBet <= 0) return;
   socket.emit('placeBet', { amount: myBet });
-  sounds.chipPlace();
-  bettingPanel.classList.add('hidden');
+  sounds.chipPlace(); bettingPanel.classList.add('hidden');
 });
-
 $('allInBtn').addEventListener('click', () => {
-  socket.emit('allIn');
-  sounds.allIn();
-  bettingPanel.classList.add('hidden');
+  socket.emit('allIn'); sounds.allIn(); bettingPanel.classList.add('hidden');
 });
 
 /* ─── Actions ─────────────────────────────────────────────── */
-$('hitBtn').addEventListener('click', () => {
-  socket.emit('hit');
-  sounds.buttonClick();
-  sounds.cardDeal();
-});
-$('standBtn').addEventListener('click', () => {
-  socket.emit('stand');
-  sounds.buttonClick();
-});
-$('doubleBtn').addEventListener('click', () => {
-  socket.emit('double');
-  sounds.buttonClick();
-  sounds.cardDeal();
-});
+$('hitBtn').addEventListener('click', () => { socket.emit('hit'); sounds.buttonClick(); sounds.cardDeal(); });
+$('standBtn').addEventListener('click', () => { socket.emit('stand'); sounds.buttonClick(); });
+$('doubleBtn').addEventListener('click', () => { socket.emit('double'); sounds.buttonClick(); sounds.cardDeal(); });
 
 /* ─── Chat ────────────────────────────────────────────────── */
 sendBtn.addEventListener('click', sendChat);
 chatInput.addEventListener('keydown', e => e.key === 'Enter' && sendChat());
-
 function sendChat() {
   const msg = chatInput.value.trim();
   if (!msg) return;
   socket.emit('chat', { message: msg });
-  chatInput.value = '';
-  sounds.buttonClick();
+  chatInput.value = ''; sounds.buttonClick();
 }
-
 socket.on('chat', msg => {
   const div = document.createElement('div');
   div.className = 'chat-msg' + (msg.system ? ' system' : '') + (msg.special === 'allIn' ? ' allin-msg' : '');
   div.innerHTML = `<span class="msg-nick">${esc(msg.nickname)}:</span><span class="msg-text"> ${esc(msg.message)}</span>`;
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
-
-  // Switch to chat tab if not active
-  if (!$('tab-chat').classList.contains('active') && !msg.system) {
-    document.querySelector('[data-tab="chat"]').classList.add('pulse-gold');
+  if (sidePanel.classList.contains('closed') && !msg.system) {
+    reopenPanelBtn.style.color = '#f0c040';
+    setTimeout(() => reopenPanelBtn.style.color = '', 2000);
   }
 });
 
-/* ─── Game State Updates ──────────────────────────────────── */
+/* ─── Game State ──────────────────────────────────────────── */
 socket.on('gameState', state => {
   gs = state;
   renderDealer(state.dealer);
   renderOtherPlayers(state);
   renderMyArea(state);
   updateHeader(state);
+  if (state.epicHands?.length) updateEpicHands(state.epicHands);
 });
 
 socket.on('phase', data => {
@@ -230,12 +231,9 @@ socket.on('countdown', ({ key, left, playerId }) => {
   if (key === 'betting') {
     showCountdown(left, cdMax, 'Tiempo para apostar');
   } else if (key === 'turn') {
-    if (playerId === myId) {
-      showCountdown(left, 30, 'Tu turno');
-    } else {
-      const p = gs?.players?.[playerId];
-      showCountdown(left, 30, p ? `Turno de ${p.nickname}` : 'Turno...');
-    }
+    const p = gs?.players?.[playerId];
+    const label = playerId === myId ? 'TU TURNO ⚡' : `Turno de ${p?.nickname || '...'}`;
+    showCountdown(left, 30, label);
     if (left <= 5) sounds.tick();
   }
 });
@@ -244,6 +242,10 @@ socket.on('yourTurn', ({ timeLeft }) => {
   cdMax = timeLeft;
   showCountdown(timeLeft, timeLeft, 'TU TURNO ⚡');
   flashPhase('TU TURNO ⚡');
+  actionPanel.classList.remove('hidden');
+  const me = gs?.players?.[myId];
+  $('doubleBtn').disabled = !me || me.cards?.length !== 2 || me.chips < me.bet;
+  sounds.cardDeal();
 });
 
 socket.on('allInAlert', ({ nickname, bet }) => {
@@ -254,67 +256,69 @@ socket.on('allInAlert', ({ nickname, bet }) => {
 });
 
 socket.on('rankings', updateRankings);
-socket.on('epicHands', updateEpicHands);
 
-socket.on('playerJoined', ({ nickname }) => {
-  addSystemMsg(`${nickname} entró a la mesa`);
-});
-socket.on('playerLeft', ({ nickname }) => {
-  addSystemMsg(`${nickname} salió de la mesa`);
-});
+socket.on('playerJoined', ({ nickname }) => addSystemMsg(`${nickname} entró a la mesa`));
+socket.on('playerLeft',   ({ nickname }) => addSystemMsg(`${nickname} salió de la mesa`));
 
-/* ─── Render Functions ────────────────────────────────────── */
+/* ─── Render: Cards ───────────────────────────────────────── */
 function renderCard(card, small = false) {
   if (!card) return '';
-  if (card.hidden) return `<div class="card face-down ${small ? 'sm' : ''}"></div>`;
+  if (card.hidden) return `<div class="card face-down${small ? ' sm' : ''}"></div>`;
   const red = card.suit === '♥' || card.suit === '♦';
-  const color = red ? 'red' : 'black';
   return `
-    <div class="card face-up ${color} ${small ? 'sm' : ''}">
+    <div class="card face-up ${red ? 'red' : 'black'}${small ? ' sm' : ''}">
       <div class="card-tl"><span class="card-val">${card.value}</span><span class="card-s">${card.suit}</span></div>
       <div class="card-mid">${card.suit}</div>
       <div class="card-br"><span class="card-val">${card.value}</span><span class="card-s">${card.suit}</span></div>
     </div>`;
 }
 
+/* ─── Render: Dealer ──────────────────────────────────────── */
 function renderDealer(dealer) {
   if (!dealer?.cards?.length) {
-    dealerCardsEl.innerHTML = '';
-    dealerScoreEl.classList.add('hidden');
-    return;
+    dealerCardsEl.innerHTML = ''; dealerScoreEl.classList.add('hidden'); return;
   }
   dealerCardsEl.innerHTML = dealer.cards.map(c => renderCard(c)).join('');
   if (dealer.score !== null && dealer.score !== undefined) {
     dealerScoreEl.textContent = dealer.score;
-    dealerScoreEl.className = 'score-badge' + (dealer.score > 21 ? ' bust' : dealer.score === 21 ? ' blackjack' : '');
+    dealerScoreEl.className = 'score-badge' +
+      (dealer.score > 21 ? ' bust' : dealer.score === 21 ? ' blackjack' : '');
     dealerScoreEl.classList.remove('hidden');
   } else {
     dealerScoreEl.classList.add('hidden');
   }
 }
 
+/* ─── Render: Other Players (arc) ─────────────────────────── */
 function renderOtherPlayers(state) {
   const others = (state.playerOrder || []).filter(id => id !== myId && state.players[id]);
-  otherPlayersEl.innerHTML = others.map(id => {
+  const n = Math.min(others.length, 4);
+  const positions = SEAT_POS[n] || SEAT_POS[4];
+  const sizeClass = n >= 4 ? 'sz-sm' : n >= 3 ? 'sz-md' : '';
+
+  otherPlayersEl.innerHTML = others.slice(0, 4).map((id, i) => {
     const p = state.players[id];
+    const [lp, tp] = positions[i] || positions[positions.length - 1];
     const isPlaying = state.currentPlayerId === id;
     const statusCls = p.status === 'bust' ? 'bust' : p.status === 'blackjack' ? 'blackjack' : '';
     const cards = (p.cards || []).map(c => renderCard(c, true)).join('');
     return `
-      <div class="player-seat ${isPlaying ? 'is-playing' : ''} ${statusCls}">
+      <div class="player-seat ${isPlaying ? 'is-playing' : ''} ${statusCls} ${sizeClass}"
+           style="left:${lp}%;top:${tp}%">
         ${isPlaying ? '<div class="turn-indicator">EN JUEGO</div>' : ''}
         <div class="seat-nickname">${esc(p.nickname)}</div>
         <div class="seat-chips">⬡ ${p.chips}</div>
         ${p.bet > 0 ? `<div class="seat-bet">Apuesta: ${p.bet}</div>` : ''}
         <div class="seat-cards">${cards}</div>
-        ${p.score > 0 && p.cards?.length > 0 ? `<div class="seat-status">${p.score}</div>` : ''}
+        ${p.score > 0 && p.cards?.length ? `<div class="seat-status">${p.score}</div>` : ''}
         ${p.result ? `<div class="seat-status">${p.result}</div>` : ''}
       </div>`;
   }).join('');
 }
 
-let lastMyScore = 0;
-let lastMyStatus = '';
+/* ─── Render: My Area ─────────────────────────────────────── */
+let lastCardCount = 0;
+let lastMyStatus  = '';
 
 function renderMyArea(state) {
   const me = state.players?.[myId];
@@ -328,9 +332,9 @@ function renderMyArea(state) {
   const cardHTML = (me.cards || []).map(c => renderCard(c)).join('');
   if (myCardsEl.innerHTML !== cardHTML) {
     myCardsEl.innerHTML = cardHTML;
-    if (me.cards?.length > lastMyScore) sounds.cardDeal();
+    if ((me.cards?.length || 0) > lastCardCount) sounds.cardDeal();
   }
-  lastMyScore = me.cards?.length || 0;
+  lastCardCount = me.cards?.length || 0;
 
   // Score
   if (me.score > 0 && me.cards?.length > 0) {
@@ -346,10 +350,14 @@ function renderMyArea(state) {
   myBetAmount.textContent = me.bet;
   myBetCircle.classList.toggle('has-bet', me.bet > 0);
 
-  // Results sound
-  if (state.phase === 'results' && me.status !== lastMyStatus && me.status) {
+  // Reload chips button — show only when broke and no active bet
+  const showReload = me.chips === 0 && me.bet === 0;
+  reloadChipsBtn.classList.toggle('hidden', !showReload);
+
+  // Result sound (once per result phase)
+  if (state.phase === 'results' && me.status && me.status !== lastMyStatus) {
     lastMyStatus = me.status;
-    setTimeout(() => showResultToast(me.status, me.chips > (myChips || me.chips)), 500);
+    setTimeout(() => showResultToast(me.status), 500);
   }
   if (state.phase !== 'results') lastMyStatus = '';
 }
@@ -367,56 +375,26 @@ function updatePhaseUI(p, data = {}) {
   bettingPanel.classList.add('hidden');
   actionPanel.classList.add('hidden');
 
-  const phaseLabels = {
-    lobby:   '◆ Sala de espera ◆',
-    betting: '◆ Fase de apuestas ◆',
-    dealing: '◆ Repartiendo cartas ◆',
-    playing: '◆ En juego ◆',
-    dealer:  '◆ Turno del dealer ◆',
-    results: '◆ Resultados ◆',
+  const labels = {
+    lobby: '◆ Sala de espera ◆', betting: '◆ Fase de apuestas ◆',
+    dealing: '◆ Repartiendo cartas ◆', playing: '◆ En juego ◆',
+    dealer: '◆ Turno del dealer ◆', results: '◆ Resultados ◆',
   };
-  phaseDisplay.textContent = phaseLabels[p] || p;
+  phaseDisplay.textContent = labels[p] || p;
 
   if (p === 'lobby') {
-    startPanel.classList.remove('hidden');
-    hideCountdown();
+    startPanel.classList.remove('hidden'); hideCountdown();
   } else if (p === 'betting') {
-    myBet = 0;
-    betDisplay.textContent = 0;
-    myBetAmount.textContent = 0;
+    myBet = 0; betDisplay.textContent = 0; myBetAmount.textContent = 0;
     myBetCircle.classList.remove('has-bet');
-    bettingPanel.classList.remove('hidden');
-    cdMax = 25;
+    bettingPanel.classList.remove('hidden'); cdMax = 25;
   } else if (p === 'playing') {
-    // Action panel shown only on yourTurn
-    checkMyTurn();
+    if (gs?.currentPlayerId === myId) actionPanel.classList.remove('hidden');
   } else if (p === 'results') {
     hideCountdown();
-    setTimeout(() => {
-      // Show ranking tab
-      document.querySelector('[data-tab="ranking"]').click();
-    }, 1500);
+    setTimeout(() => document.querySelector('[data-tab="ranking"]')?.click(), 1500);
   }
 }
-
-function checkMyTurn() {
-  if (!gs) return;
-  if (gs.currentPlayerId === myId) {
-    actionPanel.classList.remove('hidden');
-    // Disable double if more than 2 cards
-    const me = gs.players?.[myId];
-    $('doubleBtn').disabled = !me || me.cards?.length !== 2 || me.chips < me.bet;
-  } else {
-    actionPanel.classList.add('hidden');
-  }
-}
-
-socket.on('yourTurn', () => {
-  actionPanel.classList.remove('hidden');
-  const me = gs?.players?.[myId];
-  $('doubleBtn').disabled = !me || me.cards?.length !== 2 || me.chips < me.bet;
-  sounds.cardDeal();
-});
 
 /* ─── Countdown ───────────────────────────────────────────── */
 function showCountdown(left, max, label) {
@@ -428,11 +406,9 @@ function showCountdown(left, max, label) {
     : 'linear-gradient(90deg, var(--gold), var(--gold-bright))';
   countdownText.textContent = `${label} — ${left}s`;
 }
-function hideCountdown() {
-  countdownBar.classList.add('hidden');
-}
+function hideCountdown() { countdownBar.classList.add('hidden'); }
 
-/* ─── Ranking ─────────────────────────────────────────────── */
+/* ─── Rankings ────────────────────────────────────────────── */
 function updateRankings(list) {
   rankingList.innerHTML = list.map(item => `
     <div class="ranking-item rank-${item.rank}">
@@ -457,27 +433,21 @@ function updateEpicHands(hands) {
   }).join('');
 }
 
-socket.on('gameState', state => {
-  if (state.epicHands?.length) updateEpicHands(state.epicHands);
-});
-
 /* ─── Result Toast ────────────────────────────────────────── */
-function showResultToast(status, won) {
+function showResultToast(status) {
   resultToast.textContent = status;
   resultToast.className = 'result-toast';
-  if (status.includes('Ganaste') || status.includes('BLACKJACK') || status.includes('bust!')) {
+  if (status.includes('Ganaste') || status.includes('BLACKJACK') || status.includes('bust!') || status.includes('fichas')) {
     resultToast.classList.add('win');
     spawnParticles();
     if (status.includes('BLACKJACK')) sounds.blackjack();
     else if (status.includes('bust!')) sounds.dealerBust();
     else sounds.win();
-  } else if (status.includes('Perdiste') || status.includes('bust') && !status.includes('bust!') || status.includes('BJ')) {
+  } else if (status.includes('Perdiste') || (status.includes('bust') && !status.includes('bust!')) || status.includes('BJ')) {
     resultToast.classList.add('lose');
-    if (status.includes('bust') && !status.includes('bust!')) sounds.bust();
-    else sounds.lose();
+    status.includes('bust') ? sounds.bust() : sounds.lose();
   } else if (status.includes('Push')) {
-    resultToast.classList.add('push');
-    sounds.push();
+    resultToast.classList.add('push'); sounds.push();
   }
   resultToast.classList.remove('hidden');
   setTimeout(() => resultToast.classList.add('hidden'), 4000);
@@ -492,13 +462,10 @@ function spawnParticles() {
     p.className = 'particle';
     const size = 6 + Math.random() * 12;
     p.style.cssText = `
-      left: ${10 + Math.random() * 80}%;
-      width: ${size}px;
-      height: ${size}px;
-      background: ${colors[Math.floor(Math.random() * colors.length)]};
-      border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
-      animation: fall ${1.5 + Math.random() * 2}s ${Math.random() * 0.8}s ease-in forwards;
-    `;
+      left:${10+Math.random()*80}%;width:${size}px;height:${size}px;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      border-radius:${Math.random()>0.5?'50%':'2px'};
+      animation:fall ${1.5+Math.random()*2}s ${Math.random()*0.8}s ease-in forwards;`;
     container.appendChild(p);
     setTimeout(() => p.remove(), 4000);
   }
@@ -507,23 +474,17 @@ function spawnParticles() {
 /* ─── Utilities ───────────────────────────────────────────── */
 function esc(str) {
   return String(str ?? '')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
 function flashEl(el) {
   el.style.transform = 'scale(1.3)';
   setTimeout(() => el.style.transform = '', 200);
 }
-
 function flashPhase(text) {
   phaseDisplay.textContent = text;
   phaseDisplay.style.color = '#f0c040';
   setTimeout(() => phaseDisplay.style.color = '', 2000);
 }
-
 function addSystemMsg(msg) {
   const div = document.createElement('div');
   div.className = 'chat-msg system';
